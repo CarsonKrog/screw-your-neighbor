@@ -13,6 +13,13 @@ def getLine(conn):
             break
     return msg.decode()
 
+# Invoked each time a client makes a new connection to the server
+def handleClient(connInfo):
+    clientConn, clientAddr = connInfo  # a pair of (socket, clientAddr) from accept()
+    clientIP = clientAddr[0]
+    print("Received connection from %s:%d" %(clientIP, clientAddr[1]))
+
+    clientConn.close()
 
 port = int(sys.argv[1])
 
@@ -20,14 +27,7 @@ port = int(sys.argv[1])
 listener = socket(AF_INET, SOCK_STREAM)
 listener.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 listener.bind(('', port))
-listener.listen(6)  # Support up to 6 simultaneous connections, the max number of players
-
-# Invoked each time a client makes a new connection to the server
-def handleClient(connInfo):
-    clientConn, clientAddr = connInfo  # a pair of (socket, clientAddr) from accept()
-    clientIP = clientAddr[0]
-    print("Received connection from %s:%d" %(clientIP, clientAddr[1]))
-    clientConn.close()
+listener.listen(32)  # Support up to 32 simultaneous connections
 
 running = True
 while running:
