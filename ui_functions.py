@@ -3,6 +3,12 @@ import time
 
 CARD_DELAY = 0.5
 
+def flush_input_curses(stdscr):
+    stdscr.nodelay(True)
+    while stdscr.getch() != -1:
+        pass
+    stdscr.nodelay(False)
+
 def get_player_positions(stdscr, box_height=10, box_width=60):
     max_y, max_x = stdscr.getmaxyx()
     box_top = (max_y - box_height) // 2
@@ -14,10 +20,10 @@ def get_player_positions(stdscr, box_height=10, box_width=60):
     spacing_y = 8
 
     return {
-        0: (center_y-3, box_left - 16),                          # Far left
+        0: (center_y-3, box_left - 16),                        # Far left
         1: (box_top - spacing_y, center_x - spacing_x),        # Top-left
         2: (box_top - spacing_y, center_x + spacing_x),        # Top-right
-        3: (center_y-3, box_left + box_width + 16),              # Far right
+        3: (center_y-3, box_left + box_width + 16),            # Far right
         4: (box_top + box_height + 2, center_x + spacing_x),   # Bottom-right
         5: (box_top + box_height + 2, center_x - spacing_x),   # Bottom-left
     }
@@ -45,11 +51,11 @@ def draw_card(value=None, suit=None):
 def flip_card(stdscr, y, x_center, value, suit):
     frames = [
         [
-            "_____",
-            " |     |",
-            " |     |",
-            " |     |",
-            " |_____|"
+            " _____",
+            "|     |",
+            "|     |",
+            "|     |",
+            "|_____|"
         ],
         [
             "   | |",
@@ -64,7 +70,7 @@ def flip_card(stdscr, y, x_center, value, suit):
         for i, line in enumerate(frame):
             stdscr.addstr(y + i, x_center - len(line) // 2, line)
         stdscr.refresh()
-        time.sleep(0.08)
+        time.sleep(0.1)
 
 def draw_center_box(stdscr, height, width):
     max_y, max_x = stdscr.getmaxyx()
@@ -76,9 +82,12 @@ def draw_center_box(stdscr, height, width):
         else:
             stdscr.addstr(top + i, left, "|" + " " * (width - 2) + "|")
 
-def draw_player_label(stdscr, y, x_center, name, lives):
+def draw_player_label(stdscr, y, x_center, name, lives, isDealer):
     label = f"{name} [ {lives} ]"
-    stdscr.addstr(y, x_center - len(label) // 2, label)
+    if isDealer:
+        stdscr.addstr(y, x_center - len(label) // 2, label, curses.A_UNDERLINE)
+    else:
+        stdscr.addstr(y, x_center - len(label) // 2, label)
 
 def draw_blank_card(stdscr, y, x_center):
     card = draw_card()
@@ -131,25 +140,37 @@ def player_action(stdscr, seat, action):
     stdscr.addstr(y + 7, x - len(action) // 2, action)
     stdscr.refresh()
 
-def draw_table(stdscr, players, host_player=None, box_height=10, box_width=60):
+def draw_waiting(stdscr, username):
+    max_y, max_x = stdscr.getmaxyx()
+    message = f"Waiting for {username} to start game"
+    msg_y = (max_y - 10) // 2 + 4
+    msg_x = (max_x - len(message)) // 2
+    stdscr.addstr(msg_y, msg_x, message, curses.A_BOLD)
+    stdscr.addstr(msg_y+2, msg_x+6, "press [s] to start")
+    stdscr.refresh()
+
+def clear_waiting(stdscr):
+    max_y, max_x = stdscr.getmaxyx()
+    msg_y = (max_y - box_height) // 2 + 4
+    filler = "|" + " " * 58 + "|"
+    msg_x = (max_x - len(filler)) // 2
+    stdscr.addstr(msg_y, msg_x, filler)
+    stdscr.refresh()
+
+
+def draw_table(stdscr, players, box_height=10, box_width=60):
     stdscr.clear()
     max_y, max_x = stdscr.getmaxyx()
 
-    if host_player:
-        waiting_msg = f"Waiting for {host_player} to start game"
-        stdscr.addstr(1, (max_x - len(waiting_msg)) // 2, waiting_msg)
-    else:
-        stdscr.move(1, 0)
-        stdscr.clrtoeol()
-
     draw_center_box(stdscr, box_height, box_width)
+
     positions = get_player_positions(stdscr, box_height, box_width)
 
     for i in range(6):
         if i in players:
-            name, lives = players[i]
+            name, lives, isDealer = players[i]
             y, x = positions[i]
-            draw_player_label(stdscr, y, x, name, lives)
+            draw_player_label(stdscr, y, x, name, lives, isDealer)
 
     stdscr.refresh()
 
@@ -172,6 +193,8 @@ def decision_card(stdscr, card):
     prompt_x = (max_x - len(prompt)) // 2
     stdscr.addstr(card_y + card_height + 1, prompt_x, prompt)
     stdscr.refresh()
+
+    flush_input_curses(stdscr)
     
     decison = 'k'
     while True:
@@ -216,7 +239,6 @@ def losers(stdscr, usernames, cards):
 
     stdscr.refresh()
 
-
 # def test(stdscr):
 #     curses.curs_set(0)
 #     stdscr.clear()
@@ -232,14 +254,18 @@ def losers(stdscr, usernames, cards):
 #     spacing_x = 20
 #     spacing_y = 8
 # 
-#     draw_table(stdscr, {0:["ron", 4], 1:["bob", 4]})
+#     draw_table(stdscr, {0:["ron", 4, True], 1:["bob", 4, False]})
+#     draw_waiting(stdscr, "ron")
 #     time.sleep(5)
+#     draw_table(stdscr, {0:["ron", 4, True], 1:["bob", 4, False]})
 #     deal(stdscr, [1, 0], "A♣")
 #     time.sleep(2)
 #     player_action(stdscr, 1, "keep")
 #     time.sleep(1)
 #     x = decision_card(stdscr, "Q♠")
-#     reveal_cards(stdscr, [1, 0], {0:["A♣", "K♣"], 1:["10♣"]})
+#     player_action(stdscr, 0, "keep")
+#     time.sleep(1)
+#     reveal_cards(stdscr, [0, 1], {0:["10♣"], 1:["A♣", "K♣"]})
 #     time.sleep(1)
 #     #losers(stdscr, ["ron", "bob", "dan", "eric"], ["A♠", "A♣","A♠", "A♣"])
 #     losers(stdscr, ["ron"], ["A♠"])
@@ -247,7 +273,7 @@ def losers(stdscr, usernames, cards):
 #     #draw_table(stdscr, {0:["ron", 3], 1:["bob", 4]})
 # 
 #     stdscr.getch()
-
-
-
-#curses.wrapper(test)
+# 
+# 
+# 
+# curses.wrapper(test)
