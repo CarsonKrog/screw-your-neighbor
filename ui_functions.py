@@ -239,6 +239,18 @@ def losers(stdscr, usernames, cards):
 
     stdscr.refresh()
 
+def wait_for_start_key(stdscr):
+    # Try to flush input manually
+    stdscr.nodelay(True)
+    while stdscr.getch() != -1:
+        pass  # Discard input
+    stdscr.nodelay(False)
+
+    while True:
+        key = stdscr.getch()
+        if key == ord('s'):
+            return
+
 # def test(stdscr):
 #     curses.curs_set(0)
 #     stdscr.clear()
