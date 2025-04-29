@@ -71,6 +71,10 @@ def main(stdscr):
                     flip_order = parse_list(str_flip_order)
                     deal(stdscr, flip_order, player_card)
 
+                elif msg[0:9] == "FLIP_CARD":
+                    _, seat, card = msg.split(":")
+                    flip_card_at_position(stdscr, int(seat), card)
+
                 elif msg[0:13] == "PLAYER_ACTION":
                     seat = int(msg[14:15])
                     action = msg[16:]
@@ -80,6 +84,10 @@ def main(stdscr):
                     card = msg[9:]
                     decision = decision_card(stdscr, card)
                     serverSock.sendall(decision.encode())
+
+                elif msg[0:8] == "NEW_CARD":
+                    card = msg[9:]
+                    new_card(stdscr, card)
 
                 elif msg[0:6] == "REVEAL":
                     _, strSize, strFlipOrder = msg.split(":")

@@ -3,18 +3,22 @@ import time
 
 CARD_DELAY = 0.5
 
+
+BOX_HEIGHT = 10
+BOX_WIDTH = 60
+
 def flush_input_curses(stdscr):
     stdscr.nodelay(True)
     while stdscr.getch() != -1:
         pass
     stdscr.nodelay(False)
 
-def get_player_positions(stdscr, box_height=10, box_width=60):
+def get_player_positions(stdscr):
     max_y, max_x = stdscr.getmaxyx()
-    box_top = (max_y - box_height) // 2
-    box_left = (max_x - box_width) // 2
-    center_x = box_left + box_width // 2
-    center_y = box_top + box_height // 2
+    box_top = (max_y - BOX_HEIGHT) // 2
+    box_left = (max_x - BOX_WIDTH) // 2
+    center_x = box_left + BOX_WIDTH // 2
+    center_y = box_top + BOX_HEIGHT // 2
 
     spacing_x = 20
     spacing_y = 8
@@ -23,9 +27,9 @@ def get_player_positions(stdscr, box_height=10, box_width=60):
         0: (center_y-3, box_left - 16),                        # Far left
         1: (box_top - spacing_y, center_x - spacing_x),        # Top-left
         2: (box_top - spacing_y, center_x + spacing_x),        # Top-right
-        3: (center_y-3, box_left + box_width + 16),            # Far right
-        4: (box_top + box_height + 2, center_x + spacing_x),   # Bottom-right
-        5: (box_top + box_height + 2, center_x - spacing_x),   # Bottom-left
+        3: (center_y-3, box_left + BOX_WIDTH + 16),            # Far right
+        4: (box_top + BOX_HEIGHT + 2, center_x + spacing_x),   # Bottom-right
+        5: (box_top + BOX_HEIGHT + 2, center_x - spacing_x),   # Bottom-left
     }
 
 def draw_card(value=None, suit=None):
@@ -72,15 +76,26 @@ def flip_card(stdscr, y, x_center, value, suit):
         stdscr.refresh()
         time.sleep(0.1)
 
-def draw_center_box(stdscr, height, width):
+def flip_card_at_position(stdscr, seat_index, card_str):
+    positions = get_player_positions(stdscr)
+
+    y, x = positions[seat_index]
+
+    value = card_str[:-1]
+    suit = card_str[-1]
+
+    flip_card(stdscr, y + 1, x, value, suit)
+    #stdscr.refresh()
+
+def draw_center_box(stdscr):
     max_y, max_x = stdscr.getmaxyx()
-    top = (max_y - height) // 2
-    left = (max_x - width) // 2
-    for i in range(height):
-        if i == 0 or i == height - 1:
-            stdscr.addstr(top + i, left, "+" + "-" * (width - 2) + "+")
+    top = (max_y - BOX_HEIGHT) // 2
+    left = (max_x - BOX_WIDTH) // 2
+    for i in range(BOX_HEIGHT):
+        if i == 0 or i == BOX_HEIGHT - 1:
+            stdscr.addstr(top + i, left, "+" + "-" * (BOX_WIDTH - 2) + "+")
         else:
-            stdscr.addstr(top + i, left, "|" + " " * (width - 2) + "|")
+            stdscr.addstr(top + i, left, "|" + " " * (BOX_WIDTH - 2) + "|")
 
 def draw_player_label(stdscr, y, x_center, name, lives, isDealer):
     label = f"{name} [ {lives} ]"
@@ -102,6 +117,9 @@ def deal(stdscr, flip_order, card):
         stdscr.refresh()
         time.sleep(CARD_DELAY)
 
+    if card == "NONE":
+        return
+
     value = card[:-1]
     suit = card[-1]
 
@@ -110,11 +128,19 @@ def deal(stdscr, flip_order, card):
 
     card_height = len(card_lines)
     card_width = max(len(line) for line in card_lines)
-    card_y = max_y - card_height - 6
-    card_x = (max_x - card_width) // 2
+
+    # Find the top-left corner of the table box
+    table_top = (max_y - BOX_HEIGHT) // 2
+    table_left = (max_x - BOX_WIDTH) // 2
+
+    # Center card inside the table
+    card_y = table_top + (BOX_HEIGHT - card_height) // 2
+    card_x = table_left + (BOX_WIDTH - card_width) // 2
 
     for i, line in enumerate(card_lines):
         stdscr.addstr(card_y + i, card_x, line)
+
+    stdscr.refresh()
 
     stdscr.refresh()
 
@@ -125,6 +151,9 @@ def reveal_cards(stdscr, flip_order, values):
     for key in flip_order:
         y, x = positions[key]
         cards = values[key]
+
+        if cards[0][0] == "K":
+            continue
         
         for i, card_str in enumerate(cards):
             value = card_str[:-1]
@@ -140,31 +169,30 @@ def player_action(stdscr, seat, action):
     stdscr.addstr(y + 7, x - len(action) // 2, action)
     stdscr.refresh()
 
-def draw_waiting(stdscr, username):
+def table_message(stdscr, message):
+    clear_waiting(stdscr)
     max_y, max_x = stdscr.getmaxyx()
-    message = f"Waiting for {username} to start game"
     msg_y = (max_y - 10) // 2 + 4
     msg_x = (max_x - len(message)) // 2
     stdscr.addstr(msg_y, msg_x, message, curses.A_BOLD)
-    stdscr.addstr(msg_y+2, msg_x+6, "press [s] to start")
     stdscr.refresh()
 
 def clear_waiting(stdscr):
     max_y, max_x = stdscr.getmaxyx()
-    msg_y = (max_y - box_height) // 2 + 4
+    msg_y = (max_y - BOX_HEIGHT) // 2 + 4
     filler = "|" + " " * 58 + "|"
     msg_x = (max_x - len(filler)) // 2
     stdscr.addstr(msg_y, msg_x, filler)
     stdscr.refresh()
 
 
-def draw_table(stdscr, players, box_height=10, box_width=60):
+def draw_table(stdscr, players):
     stdscr.clear()
     max_y, max_x = stdscr.getmaxyx()
 
-    draw_center_box(stdscr, box_height, box_width)
+    draw_center_box(stdscr)
 
-    positions = get_player_positions(stdscr, box_height, box_width)
+    positions = get_player_positions(stdscr)
 
     for i in range(6):
         if i in players:
@@ -183,30 +211,64 @@ def decision_card(stdscr, card):
 
     card_height = len(card_lines)
     card_width = max(len(line) for line in card_lines)
-    card_y = max_y - card_height - 6
-    card_x = (max_x - card_width) // 2
+
+    # Calculate the center of the table box, not the whole screen
+    table_top = (max_y - BOX_HEIGHT) // 2
+    table_left = (max_x - BOX_WIDTH) // 2
+
+    # Center inside the box
+    card_y = table_top + (BOX_HEIGHT - card_height) // 2
+    card_x = table_left + (BOX_WIDTH - card_width) // 2
 
     for i, line in enumerate(card_lines):
         stdscr.addstr(card_y + i, card_x, line)
 
     prompt = "[s] switch || [k] keep"
-    prompt_x = (max_x - len(prompt)) // 2
+    prompt_x = table_left + (BOX_WIDTH - len(prompt)) // 2
     stdscr.addstr(card_y + card_height + 1, prompt_x, prompt)
+
     stdscr.refresh()
 
     flush_input_curses(stdscr)
     
-    decison = 'k'
+    decision = 'keep\n'
     while True:
         key = stdscr.getch()
         if key == ord('s'):
-            decision = 's'
+            decision = 'switch\n'
             break
         elif key == ord('k'):
             break
 
     stdscr.move(card_y + card_height + 1, prompt_x)
+
+    # replace prompt with table edges
+    stdscr.addstr(card_y + card_height + 1, prompt_x - 19 , "|                                                          |")
     stdscr.clrtoeol()
+    stdscr.refresh()
+    return decision
+
+def new_card(stdscr, card):
+    value = card[:-1]
+    suit = card[-1]
+
+    max_y, max_x = stdscr.getmaxyx()
+    card_lines = draw_card(value, suit)
+
+    card_height = len(card_lines)
+    card_width = max(len(line) for line in card_lines)
+
+    # Find the top-left corner of the table box
+    table_top = (max_y - BOX_HEIGHT) // 2
+    table_left = (max_x - BOX_WIDTH) // 2
+
+    # Center card inside the table
+    card_y = table_top + (BOX_HEIGHT - card_height) // 2
+    card_x = table_left + (BOX_WIDTH - card_width) // 2
+
+    for i, line in enumerate(card_lines):
+        stdscr.addstr(card_y + i, card_x, line)
+
     stdscr.refresh()
 
 def losers(stdscr, usernames, cards):
@@ -238,54 +300,3 @@ def losers(stdscr, usernames, cards):
             stdscr.addstr(card_y + j, card_x, line)
 
     stdscr.refresh()
-
-def wait_for_start_key(stdscr):
-    # Try to flush input manually
-    stdscr.nodelay(True)
-    while stdscr.getch() != -1:
-        pass  # Discard input
-    stdscr.nodelay(False)
-
-    while True:
-        key = stdscr.getch()
-        if key == ord('s'):
-            return
-
-# def test(stdscr):
-#     curses.curs_set(0)
-#     stdscr.clear()
-# 
-#     max_y, max_x = stdscr.getmaxyx()
-# 
-#     box_height, box_width = 10, 60
-#     box_top = (max_y - box_height) // 2
-#     box_left = (max_x - box_width) // 2
-#     center_x = box_left + box_width // 2
-#     center_y = box_top + box_height // 2
-# 
-#     spacing_x = 20
-#     spacing_y = 8
-# 
-#     draw_table(stdscr, {0:["ron", 4, True], 1:["bob", 4, False]})
-#     draw_waiting(stdscr, "ron")
-#     time.sleep(5)
-#     draw_table(stdscr, {0:["ron", 4, True], 1:["bob", 4, False]})
-#     deal(stdscr, [1, 0], "A♣")
-#     time.sleep(2)
-#     player_action(stdscr, 1, "keep")
-#     time.sleep(1)
-#     x = decision_card(stdscr, "Q♠")
-#     player_action(stdscr, 0, "keep")
-#     time.sleep(1)
-#     reveal_cards(stdscr, [0, 1], {0:["10♣"], 1:["A♣", "K♣"]})
-#     time.sleep(1)
-#     #losers(stdscr, ["ron", "bob", "dan", "eric"], ["A♠", "A♣","A♠", "A♣"])
-#     losers(stdscr, ["ron"], ["A♠"])
-#     #time.sleep(5)
-#     #draw_table(stdscr, {0:["ron", 3], 1:["bob", 4]})
-# 
-#     stdscr.getch()
-# 
-# 
-# 
-# curses.wrapper(test)
