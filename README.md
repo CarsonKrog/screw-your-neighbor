@@ -5,3 +5,8 @@ To run:
 Server: python3 server.py {port number}
 
 Player: python3 player.py {server ip} {server port} {username}
+
+  
+Game Demo
+---
+![Demo](assets/game_demo.gif)
